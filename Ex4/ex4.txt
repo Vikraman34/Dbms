@@ -1,0 +1,553 @@
+SQL> set echo on;
+SQL> set line 150;
+SQL> @C:\Users\Viki\Desktop\ex4.sql
+SQL> leREM ASSIGNMENT 4:Views – Security
+SP2-0734: unknown command beginning "leREM ASSI..." - rest of line ignored.
+SQL> 
+SQL> REM 1. Create a view Schedule_15 that display the flight number, route, airport(origin, destination) departure (date, time), arrival (date, time) of a flight on 15 apr 2005. Label the view column as flight, route, from_airport, to_airport, ddate, dtime, adate, atime respectively
+SQL> 
+SQL> 
+SQL> CREATE OR REPLACE VIEW Schedule_15 (Flight,Route,From_Airport,
+  2  			     To_Airport,Ddate,Dtime,Adate,Atime)
+  3  AS (SELECT f.flightno,r.routeid,r.orig_airport,
+  4  	     r.dest_airport,fl.departs,fl.dtime,fl.arrives,fl.atime
+  5  FROM Flights f,Routes r,fl_schedule fl
+  6  WHERE f.rid=r.routeid AND f.flightno=fl.flno
+  7  	     AND fl.departs = '15-APR-2005');
+
+View created.
+
+SQL> 
+SQL> SELECT * FROM Schedule_15;
+
+FLIGHT  ROUTE  FROM_AIRPORT         TO_AIRPORT           DDATE          DTIME ADATE          ATIME                                                    
+------- ------ -------------------- -------------------- --------- ---------- --------- ----------                                                    
+JJ-2482 LW100  Los Angeles          Washington D.C.      15-APR-05       1230 15-APR-05       1540                                                    
+SQ-11   LT105  Los Angeles          Tokyo                15-APR-05       1230 16-APR-05       2055                                                    
+HA-1    LH106  Los Angeles          Honolulu             15-APR-05       1110 15-APR-05       1445                                                    
+A5-3246 CN151  Chicago              New York             15-APR-05       1810 15-APR-05       1900                                                    
+9E-3851 MD200  Madison              Detroit              15-APR-05       1035 15-APR-05       1140                                                    
+MQ-4477 DN250  Detroit              New York             15-APR-05       1510 15-APR-05       1600                                                    
+RP-5018 MC201  Madison              Chicago              15-APR-05       2100 15-APR-05       2155                                                    
+BA-178  NYL400 New York             London               15-APR-05       1140 16-APR-05       1020                                                    
+
+8 rows selected.
+
+SQL> 
+SQL> SAVEPOINT s1;
+
+Savepoint created.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM INSERT
+SQL> INSERT INTO Schedule_15 VALUES(
+  2  	     'BUG-25',
+  3  	     'AD123',
+  4  	     'New York',
+  5  	     'London',
+  6  	     '15-APR-05',
+  7  	     1002,
+  8  	     '15-APR-05',
+  9  	     1130);
+INSERT INTO Schedule_15 VALUES(
+*
+ERROR at line 1:
+ORA-01779: cannot modify a column which maps to a non key-preserved table 
+
+
+SQL> 
+SQL> SELECT * FROM Schedule_15
+  2  WHERE flight='BUG-25';
+
+no rows selected
+
+SQL> 
+SQL> ROLLBACK TO s1;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM Updatable columns
+SQL> SELECT table_name,column_name,updatable,insertable,deletable
+  2  FROM user_updatable_columns
+  3  WHERE table_name='SCHEDULE_15';
+
+TABLE_NAME                     COLUMN_NAME                    UPD INS DEL                                                                             
+------------------------------ ------------------------------ --- --- ---                                                                             
+SCHEDULE_15                    FLIGHT                         NO  NO  NO                                                                              
+SCHEDULE_15                    ROUTE                          NO  NO  NO                                                                              
+SCHEDULE_15                    FROM_AIRPORT                   NO  NO  NO                                                                              
+SCHEDULE_15                    TO_AIRPORT                     NO  NO  NO                                                                              
+SCHEDULE_15                    DDATE                          YES YES YES                                                                             
+SCHEDULE_15                    DTIME                          YES YES YES                                                                             
+SCHEDULE_15                    ADATE                          YES YES YES                                                                             
+SCHEDULE_15                    ATIME                          YES YES YES                                                                             
+
+8 rows selected.
+
+SQL> 
+SQL> 
+SQL> REM Update
+SQL> UPDATE Schedule_15
+  2  SET Ddate='15-APR-05',Dtime=1000,Adate='20-MAR-23',Atime=1050
+  3  WHERE Flight='HA-1';
+
+1 row updated.
+
+SQL> 
+SQL> 
+SQL> REM VIEW After Update
+SQL> SELECT * FROM Schedule_15
+  2  WHERE Flight='HA-1';
+
+FLIGHT  ROUTE  FROM_AIRPORT         TO_AIRPORT           DDATE          DTIME ADATE          ATIME                                                    
+------- ------ -------------------- -------------------- --------- ---------- --------- ----------                                                    
+HA-1    LH106  Los Angeles          Honolulu             15-APR-05       1000 20-MAR-23       1050                                                    
+
+SQL> 
+SQL> 
+SQL> REM TABLE After Update
+SQL> SELECT * FROM Fl_Schedule
+  2  WHERE flno='HA-1';
+
+FLNO    DEPARTS        DTIME ARRIVES        ATIME      PRICE                                                                                          
+------- --------- ---------- --------- ---------- ----------                                                                                          
+HA-1    15-APR-05       1000 20-MAR-23       1050     375.23                                                                                          
+
+SQL> 
+SQL> ROLLBACK TO s1;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM DELETE
+SQL> DELETE FROM Schedule_15
+  2  WHERE Flight='HA-1';
+
+1 row deleted.
+
+SQL> 
+SQL> SELECT * FROM Schedule_15
+  2  WHERE Flight='HA-1';
+
+no rows selected
+
+SQL> 
+SQL> SELECT * FROM Fl_Schedule
+  2  WHERE flno='HA-1';
+
+no rows selected
+
+SQL> 
+SQL> ROLLBACK TO s1;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> REM Conclusion
+SQL> REM INSERT - NO
+SQL> REM UPDATE - YES(Can update ddate,dtime,adate,atime and is reflected in parent table)
+SQL> REM DELETE - YES(deleted in parent table)
+SQL> 
+SQL> 
+SQL> REM 2. Define a view Airtype that display the number of aircrafts for each of its type. Label the column as craft_type, total.
+SQL> 
+SQL> 
+SQL> CREATE OR REPLACE VIEW Airtype (Craft_Type,Total)
+  2  AS (SELECT type,COUNT(*)
+  3  FROM Aircraft
+  4  GROUP BY type);
+
+View created.
+
+SQL> 
+SQL> 
+SQL> SELECT * FROM Airtype;
+
+CRAFT_TYPE      TOTAL                                                                                                                                 
+---------- ----------                                                                                                                                 
+Boeing              6                                                                                                                                 
+Saab                1                                                                                                                                 
+Airbus              3                                                                                                                                 
+BAe                 1                                                                                                                                 
+Schweizer           1                                                                                                                                 
+Piper               1                                                                                                                                 
+Lockheed            1                                                                                                                                 
+Tupolev             1                                                                                                                                 
+Embraer             1                                                                                                                                 
+
+9 rows selected.
+
+SQL> 
+SQL> SAVEPOINT s2;
+
+Savepoint created.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM INSERT
+SQL> INSERT INTO Airtype VALUES(
+  2  	     'Nimbus',
+  3  	     10);
+INSERT INTO Airtype VALUES(
+*
+ERROR at line 1:
+ORA-01733: virtual column not allowed here 
+
+
+SQL> 
+SQL> SELECT * FROM Airtype
+  2  WHERE craft_type='Nimbus';
+
+no rows selected
+
+SQL> 
+SQL> ROLLBACK TO s2;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> REM Updatable columns
+SQL> SELECT table_name,column_name,updatable,insertable,deletable
+  2  FROM user_updatable_columns
+  3  WHERE table_name='AIRTYPE';
+
+TABLE_NAME                     COLUMN_NAME                    UPD INS DEL                                                                             
+------------------------------ ------------------------------ --- --- ---                                                                             
+AIRTYPE                        CRAFT_TYPE                     NO  NO  NO                                                                              
+AIRTYPE                        TOTAL                          NO  NO  NO                                                                              
+
+SQL> 
+SQL> 
+SQL> 
+SQL> REM DELETE
+SQL> DELETE FROM Airtype
+  2  WHERE Total=1;
+DELETE FROM Airtype
+            *
+ERROR at line 1:
+ORA-01732: data manipulation operation not legal on this view 
+
+
+SQL> 
+SQL> ROLLBACK TO s2;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> REM Conclusion
+SQL> REM INSERT - NO
+SQL> REM UPDATE - NO
+SQL> REM DELETE - NO
+SQL> 
+SQL> 
+SQL> 
+SQL> REM 3. Create a view Losangeles_Route that contains Los Angeles in the route. Ensure that the view always contain/allows only information about the Los Angeles route
+SQL> 
+SQL> 
+SQL> CREATE OR REPLACE VIEW Losangeles_Route(RouteId,ORigin,Destination,Distance)
+  2  AS (SELECT routeid,orig_airport,dest_airport,distance
+  3  FROM Routes
+  4  WHERE orig_airport='Los Angeles' OR dest_airport='Los Angeles');
+
+View created.
+
+SQL> 
+SQL> 
+SQL> SELECT * FROM Losangeles_Route;
+
+ROUTEI ORIGIN               DESTINATION            DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+LW100  Los Angeles          Washington D.C.            2308                                                                                           
+LC101  Los Angeles          Chicago                    1749                                                                                           
+LD102  Los Angeles          Dallas                     1251                                                                                           
+LB103  Los Angeles          Boston                     2606                                                                                           
+LS104  Los Angeles          Sydney                     7487                                                                                           
+LT105  Los Angeles          Tokyo                      5478                                                                                           
+LH106  Los Angeles          Honolulu                   2551                                                                                           
+CL150  Chicago              Los Angeles                1749                                                                                           
+LNY107 Los Angeles          New York                   2510                                                                                           
+
+9 rows selected.
+
+SQL> 
+SQL> SAVEPOINT s3;
+
+Savepoint created.
+
+SQL> 
+SQL> REM INSERT
+SQL> INSERT INTO Losangeles_Route VALUES(
+  2  	     'AB123',
+  3  	     'INDIA',
+  4  	     'Los Angeles',
+  5  	     3400);
+
+1 row created.
+
+SQL> 
+SQL> SELECT * FROM Losangeles_Route
+  2  WHERE routeid='AB123';
+
+ROUTEI ORIGIN               DESTINATION            DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+AB123  INDIA                Los Angeles                3400                                                                                           
+
+SQL> 
+SQL> SELECT * FROM Routes
+  2  WHERE routeid='AB123';
+
+ROUTEI ORIG_AIRPORT         DEST_AIRPORT           DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+AB123  INDIA                Los Angeles                3400                                                                                           
+
+SQL> 
+SQL> ROLLBACK TO s3;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> REM Updatable columns
+SQL> SELECT table_name,column_name,updatable,insertable,deletable
+  2  FROM user_updatable_columns
+  3  WHERE table_name='LOSANGELES_ROUTE';
+
+TABLE_NAME                     COLUMN_NAME                    UPD INS DEL                                                                             
+------------------------------ ------------------------------ --- --- ---                                                                             
+LOSANGELES_ROUTE               ROUTEID                        YES YES YES                                                                             
+LOSANGELES_ROUTE               ORIGIN                         YES YES YES                                                                             
+LOSANGELES_ROUTE               DESTINATION                    YES YES YES                                                                             
+LOSANGELES_ROUTE               DISTANCE                       YES YES YES                                                                             
+
+SQL> 
+SQL> REM Update
+SQL> UPDATE Losangeles_Route
+  2  SET Origin='Los Angeles',Destination='India',Distance=1000
+  3  WHERE routeid='CL150';
+
+1 row updated.
+
+SQL> 
+SQL> 
+SQL> REM VIEW After Update
+SQL> SELECT * FROM Losangeles_Route
+  2  WHERE routeid='CL150';
+
+ROUTEI ORIGIN               DESTINATION            DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+CL150  Los Angeles          India                      1000                                                                                           
+
+SQL> 
+SQL> 
+SQL> REM TABLE After Update
+SQL> SELECT * FROM Routes
+  2  WHERE routeid='CL150';
+
+ROUTEI ORIG_AIRPORT         DEST_AIRPORT           DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+CL150  Los Angeles          India                      1000                                                                                           
+
+SQL> 
+SQL> ROLLBACK TO s3;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> REM DELETE
+SQL> 
+SQL> DELETE FROM Losangeles_Route
+  2  WHERE routeid='LW100';
+DELETE FROM Losangeles_Route
+*
+ERROR at line 1:
+ORA-02292: integrity constraint (HR.RID_FK) violated - child record found 
+
+
+SQL> 
+SQL> SELECT * FROM Routes
+  2  WHERE routeid='LW100';
+
+ROUTEI ORIG_AIRPORT         DEST_AIRPORT           DISTANCE                                                                                           
+------ -------------------- -------------------- ----------                                                                                           
+LW100  Los Angeles          Washington D.C.            2308                                                                                           
+
+SQL> 
+SQL> 
+SQL> ROLLBACK TO s3;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> REM Conclusion
+SQL> REM INSERT - YES
+SQL> REM UPDATE - YES(reflected in the parent table)
+SQL> REM DELETE - NO
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM 4. Create a view named Losangeles_Flight on Schedule_15 (as defined in 1) that display flight, departure (date, time), arrival (date, time) of flight(s) from Los Angeles
+SQL> 
+SQL> 
+SQL> CREATE OR REPLACE VIEW Losangeles_Flight
+  2  AS (SELECT Flight,Ddate,Dtime,Adate,Atime
+  3  FROM Schedule_15
+  4  WHERE From_Airport='Los Angeles');
+
+View created.
+
+SQL> 
+SQL> SAVEPOINT s4;
+
+Savepoint created.
+
+SQL> 
+SQL> 
+SQL> SELECT * FROM Losangeles_Flight;
+
+FLIGHT  DDATE          DTIME ADATE          ATIME                                                                                                     
+------- --------- ---------- --------- ----------                                                                                                     
+JJ-2482 15-APR-05       1230 15-APR-05       1540                                                                                                     
+SQ-11   15-APR-05       1230 16-APR-05       2055                                                                                                     
+HA-1    15-APR-05       1110 15-APR-05       1445                                                                                                     
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM INSERT
+SQL> INSERT INTO Losangeles_Flight VALUES(
+  2  	     'BUG-25',
+  3  	     '15-APR-05',
+  4  	     1002,
+  5  	     '15-APR-05',
+  6  	     1130);
+INSERT INTO Losangeles_Flight VALUES(
+*
+ERROR at line 1:
+ORA-01779: cannot modify a column which maps to a non key-preserved table 
+
+
+SQL> 
+SQL> SELECT * FROM Losangeles_Flight
+  2  WHERE flight='BUG-25';
+
+no rows selected
+
+SQL> 
+SQL> ROLLBACK TO s4;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> REM Updatable columns
+SQL> SELECT table_name,column_name,updatable,insertable,deletable
+  2  FROM user_updatable_columns
+  3  WHERE table_name='LOSANGELES_FLIGHT';
+
+TABLE_NAME                     COLUMN_NAME                    UPD INS DEL                                                                             
+------------------------------ ------------------------------ --- --- ---                                                                             
+LOSANGELES_FLIGHT              FLIGHT                         NO  NO  NO                                                                              
+LOSANGELES_FLIGHT              DDATE                          YES YES YES                                                                             
+LOSANGELES_FLIGHT              DTIME                          YES YES YES                                                                             
+LOSANGELES_FLIGHT              ADATE                          YES YES YES                                                                             
+LOSANGELES_FLIGHT              ATIME                          YES YES YES                                                                             
+
+SQL> 
+SQL> 
+SQL> REM Update
+SQL> UPDATE Losangeles_Flight
+  2  SET Ddate='15-APR-05',Dtime=1000,Adate='20-MAR-23',Atime=1050
+  3  WHERE Flight='HA-1';
+
+1 row updated.
+
+SQL> 
+SQL> 
+SQL> REM VIEW After Update
+SQL> SELECT * FROM Losangeles_Flight
+  2  WHERE Flight='HA-1';
+
+FLIGHT  DDATE          DTIME ADATE          ATIME                                                                                                     
+------- --------- ---------- --------- ----------                                                                                                     
+HA-1    15-APR-05       1000 20-MAR-23       1050                                                                                                     
+
+SQL> 
+SQL> 
+SQL> REM TABLE After Update
+SQL> SELECT * FROM Fl_Schedule
+  2  WHERE flno='HA-1';
+
+FLNO    DEPARTS        DTIME ARRIVES        ATIME      PRICE                                                                                          
+------- --------- ---------- --------- ---------- ----------                                                                                          
+HA-1    15-APR-05       1000 20-MAR-23       1050     375.23                                                                                          
+
+SQL> 
+SQL> 
+SQL> ROLLBACK TO S4;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> 
+SQL> REM DELETE
+SQL> DELETE FROM Losangeles_Flight
+  2  WHERE FLIGHT='HA-1';
+
+1 row deleted.
+
+SQL> 
+SQL> 
+SQL> SELECT * FROM Losangeles_Flight
+  2  WHERE FLIGHT='HA-1';
+
+no rows selected
+
+SQL> 
+SQL> 
+SQL> SELECT * FROM Fl_Schedule
+  2  WHERE flno='HA-1';
+
+no rows selected
+
+SQL> 
+SQL> ROLLBACK TO S4;
+
+Rollback complete.
+
+SQL> 
+SQL> 
+SQL> REM Conclusion
+SQL> REM INSERT - NO
+SQL> REM UPDATE - YES(Can update ddate,dtime,adate,atime and is reflected in parent table)
+SQL> REM DELETE - YES(deleted in parent table)
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> spool off;
